@@ -1,0 +1,50 @@
+# BEAM GEOMETRY
+L - 1.2 m
+b or height h - 0.8 m
+thickness (t) - 0.4 m
+Distributed Load (w) - 100 N/m
+
+# SIMULATING AS A CANTILEVER BEAM
+
+MAX BENDING MOMENT
+M (max) = wL^2/2
+
+occurring at the root of the cantilever, the fixed end
+
+
+MOMENT OF INERTIA
+
+I = bh^3/12
+
+IF thickness increases, the stiffness increases
+
+MAXIMUM BENDING STRESS
+
+stress = M c /I
+
+c = h/2
+
+Maximum stress at root surface
+
+THUS, MAXIMUM STRESS occurs at the root and on the outer surface
+should be shown by ANSYS
+
+
+MAXIMUM TIP DEFLECTION 
+
+DEFLECTION = wl^4/8EI
+
+this can be derived from the singularity function
+
+aluminium or fiberglass, you will have to choose to obtain a value of E
+
+OBSERVATIONS
+Maximum stress occurs at blade root
+Increasing height strongly improves stiffness
+Longer blades dramatically increase deflection
+Geometry affects stiffness more than expected
+Cantilever behaviour matches that of the turbine blade 
+
+
+
+
