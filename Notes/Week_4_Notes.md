@@ -24,3 +24,7 @@
 
 - Now for the next few days, I will be running 9-10 simulations each day with different combinations and entering this data in the csv file
 - This is a MAJOR step in integrating ML into this project
+
+- After running a few batches of simulations it is clear that material choice significantly affects deformation but not stress. Carbon fiber deofrms the least, Fiberglass the most, while all three materials produce nearly identical von-Mises stress under the same load and geometry.
+- This is because stress is governed by applied load and geometry, not material stiffness. Increasing chord_length reduced deformation substantially across all materials. 
+- Key design implication - material selection controls deformation, geometry controls stress

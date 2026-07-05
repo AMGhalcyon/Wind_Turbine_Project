@@ -6,7 +6,7 @@
 * applied pressure - 1000 Pa on top of blade structure
 * mesh near trailing edge is very poor because of its sharpness, which is a drawback of the design
 * formula for taper is c(r)= Root\_chord − (Root\_chord\*0.7)×(r/blade\_span)
-* twist angle can be derived from AI chatgpt or claude( 14 - 
+* twist angle can be derived from AI chatgpt or claude( 14 - 10.5 - 7.5 - 4.7 - 2.0 )
 * **Deflection observed is similar to expected result, maximum being at the tip of the blade**
 * **Max stress is near the root at the junction between the blade and the hub attachment**
 ## Materials Study 
