@@ -3,7 +3,7 @@
 * Blade dimensions, NACA 4412 profile, 200mm root chord length with taper formula and twist, blade\_length - 1.2 m, hub attachment is 0.2m extended behind
 * mesh size - 3 e-3 metres as found from mesh convergence
 * trying to increase mesh quality near trailing edge
-* applied pressure - 1000 Pa on top of blade structure
+* applied pressure - 1000 Pa on bottom of blade structure
 * mesh near trailing edge is very poor because of its sharpness, which is a drawback of the design
 * formula for taper is c(r)= Root\_chord − (Root\_chord\*0.7)×(r/blade\_span)
 * twist angle can be derived from AI chatgpt or claude( 14 - 10.5 - 7.5 - 4.7 - 2.0 )
@@ -13,6 +13,7 @@
 Aluminium Alloy - Density = 2700 kg/m^3, Young's Modulus = 6.9 e+10 Pa, Poisson Ratio = 0.33
 Fiberglass - Density = 1900 kg/m^3, Young's Modulus = 2.5 e+10 Pa, Poisson Ratio = 0.22
 Carbon Fiber Composite - Density = 1600 kg/m^3, Young's Modulus = 1.2 e+11 Pa, Poisson Ratio = 0.28
+- Applied load is 1000 Pa, 1.2m blade length and 200mm chord length
 * **Material Study Results**
 
 
@@ -20,8 +21,8 @@ Carbon Fiber Composite - Density = 1600 kg/m^3, Young's Modulus = 1.2 e+11 Pa, P
 |**Material**|**Deformation (m)**|**Equivalent Stress (Pa)**|
 |-|-|-|
 |Aluminium Alloy|0.010566|1.0813 e+7|
-|Fiberglass|0.029204|1.0819 e+7|
-|Carbon Fiber Composite|0.0060797|1.0816 e+7|
+|Fiberglass|0.029205|1.0819 e+7|
+|Carbon Fiber Composite|0.00608|1.0816 e+7|
 
 * **Carbon Fiber** is the stiffest material due to its high Young's Modulus. It exhibits smallest deformation while also being the lightest
 **Aluminium Alloy** provides a balance between stiffness and weight, producing moderate deformation
@@ -34,9 +35,9 @@ All the materials produce similar equivalent stress readings, as it does not dep
 
 |**Load (Pa)**|**Deformation (m)**|**Equivalent Stress (Pa)**|
 |-|-|-|
-|500|0.0052829|5.4065 e+6|
+|500|0.0052832|5.4066 e+6|
 |1000|0.010566|1.0813 e+7|
-|1500|0.015849|1.622 e+7|
+|1500|0.01585|1.622 e+7|
 
 
 
@@ -56,7 +57,7 @@ All the materials produce similar equivalent stress readings, as it does not dep
 |-|-|-|
 |150|0.024251|1.9419 e+7|
 |200|0.010566|1.0813 e+7|
-|300|0.0032622|4.8257 e+6|
+|300|0.0032625|4.8258 e+6|
 
 
 
@@ -67,8 +68,8 @@ All the materials produce similar equivalent stress readings, as it does not dep
 |**Blade Length (m)**|**Deformation (m)**|**Equivalent Stress (Pa)**|
 |-|-|-|
 |1.2|0.010566|1.0813 e+7|
-|0.8|0.0021496|4.7955 e+6|
-|1.6|0.032908|1.9266 e+7|
+|0.8|0.0021498|4.7956 e+6|
+|1.6|0.032909|1.9266 e+7|
 
 
 
