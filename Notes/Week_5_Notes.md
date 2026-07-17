@@ -114,19 +114,12 @@ dtype='object') - **All features in dataset**
 ## Correlation Analysis
 
 | | Blade Length | Root Chord | Material (enc) | Applied Load | Stress | Deformation |
-
 |------------------|:---:|:---:|:---:|:---:|:---:|:---:|
-
 | Blade Length | 1.000 | 0.000 | 0.000 | 0.000 | 0.549 | 0.458 |
-
 | Root Chord | 0.000 | 1.000 | 0.000 | 0.000 | -0.530 | -0.356 |
-
 | Material (enc) | 0.000 | 0.000 | 1.000 | 0.000 | 0.000 | -0.066 |
-
 | Applied Load | 0.000 | 0.000 | 0.000 | 1.000 | 0.441 | 0.226 |
-
 | Stress | 0.549 | -0.530 | 0.000 | 0.441 | 1.000 | 0.753 |
-
 | Deformation | 0.458 | -0.356 | -0.066 | 0.226 | 0.753 | 1.000 |
 
   
@@ -143,7 +136,7 @@ dtype='object') - **All features in dataset**
 
 -  **All four input variables are mutually uncorrelated ( ~ 0.00)** - this is the expected outcome. It means any importance ranking drawn from this matrix reflects each variable's own effect, not a side-effect of correlated inputs
 
-- **Blade Length and Root Chord Length are the two strongest linear drivers of both outputs ** - applied load is a mdoerate driver. Material shows almost no linear correlation with either output
+- **Blade Length and Root Chord Length are the two strongest linear drivers of both outputs** - applied load is a mdoerate driver. Material shows almost no linear correlation with either output
 
 -  **Material's near zero correlation is misleading**, it is the effect of the label encoding, not evidence that material doesn't matter
 

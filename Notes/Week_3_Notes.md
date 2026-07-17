@@ -75,6 +75,9 @@ All the materials produce similar equivalent stress readings, as it does not dep
 
 * Both deformation and stress increase sharply, and accelerate, as blade span increases - the opposite trend from the chord study, and far more aggressive. This is exactly what cantilever beam theory predicts: : for a fixed tip load, deflection scales with span cubed (δ ∝ L^4/EI) and bending stress scales with span (σ ∝ M/Z = (load×L)/Z), so a longer blade is a much worse lever arm in both ways at once.
 * 1000 Pa pressure applied surface pressure that produces an effectively distributed line load w(r) = 1000 × c(r) N/m along the span, and note that despite the non-uniform (tapered) nature of this load, your simulation results still empirically matched the L⁴ (deflection) and L² (stress) scaling laws associated with the simpler uniform distributed-load cantilever model
+
+## Power Scaling Law
+Although the applied loading in the simulations was specified as a constant pressure rather than a distributed line load, the two are directly related through w=p*Chord, where p is the applied pressure and w is the equivalent distributed load. As the chord length increases, the applied distributed load increases proportionally, but the blade's bending stiffness increases even more rapidly because the second moment of area grows with the overall cross-sectional size. The increased stiffness outweighs the increase in loading, resulting in the theoretical scaling relationships of deflection varying approximately with the inverse cube of chord length and stress varying approximately with the inverse square of chord length. This explains why increasing chord significantly reduces both deflection and stress despite the larger area over which the pressure acts.
 ## LIMITATIONS
 - Static loading only
 - Simplified wind loading
@@ -89,4 +92,7 @@ All the materials produce similar equivalent stress readings, as it does not dep
 - Build structured dataset (CSV)
 - Begin automation where possible 
 - Prepare data for ML
+
+
+
 
