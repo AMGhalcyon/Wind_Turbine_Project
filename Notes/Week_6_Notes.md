@@ -93,7 +93,7 @@
 | Material_Carbon fiber | 0.012 |
 | Material_Aluminium | 0.009 |
 
-- ```Material_Fiberglass``` is neglogible for stress but jumps to **3rd most important feature** for deflection
+- ```Material_Fiberglass``` is negligible for stress but jumps to **3rd most important feature** for deflection
 
 ## Comparison with EDA
 | Variable | Correlation rank (Stress) | RF Importance rank (Stress) | Correlation rank (Deflection) | RF Importance rank (Deflection) |
@@ -113,7 +113,7 @@
 
 - **The Blade Length/Chord swap** likely comes from the fact that correlation measures a single global linear trend across the whole dataset, while Random Forest's impurity-based importance reflects how much each variable's actual splits reduce prediction error, which can respond differently to how the *sampled levels* of a variable are spaced and how sharply the output curves respond within that specific range. Since both variables follow steep power laws over the same three sampled levels (0.8/1.2/1.6 m and 150/200/300 mm), it isn't surprising that their relative ranking is sensitive to the analysis method.
 
-- **The Material discrepancy is the important one, and it is fully explained by Day 33's finding.** Correlation used *label encoding* (Aluminium=0, Fiberglass=1, Carbon fiber=2), which forces a false numeric ordering onto a variable that has no real order. Since deflection's true ordering is Fiberglass > Aluminium > Carbon fiber, non-monotonic with respect to that encoding, Pearson correlation was structurally blind to the effect. Random Forest, using **one-hot** columns, doesn't need Material to be ordered at all; it can split directly on "is this Fiberglass?" and immediately captures the real effect. This is the textbook example of **correlation measuring only linear relationships, while Random Forest captures nonlinear (and here, non-ordinal categorical) relationships** that correlation is mathematically incapable of seeing.
+- **The Material discrepancy is the important one, and it is fully explained by the previous findings.** Correlation used *label encoding* (Aluminium=0, Fiberglass=1, Carbon fiber=2), which forces a false numeric ordering onto a variable that has no real order. Since deflection's true ordering is Fiberglass > Aluminium > Carbon fiber, non-monotonic with respect to that encoding, Pearson correlation was structurally blind to the effect. Random Forest, using **one-hot** columns, doesn't need Material to be ordered at all; it can split directly on "is this Fiberglass?" and immediately captures the real effect. This is the textbook example of **correlation measuring only linear relationships, while Random Forest captures nonlinear (and here, non-ordinal categorical) relationships** that correlation is mathematically incapable of seeing.
 
 ## So is it consistent with beam bending theory and mechanics?
 
@@ -123,3 +123,34 @@
 
 - **Chord and Blade Length dominating both outputs matches the power-law scaling discussed earlier** (Stress ∝ BladeLength^2/Chord^2, Deflection ∝ BladeLength^4/Chord^3) — geometry has the strongest and most compounding effect on both outputs, which is reflected in both models ranking these two variables at the top.
 - **Load ranking below geometry, but still clearly relevant, is reasonable** - load enters linearly in both governing equations, while Blade Length and Chord enter as high powers, so geometry changes cause proportionally larger swings in the output across the sampled ranges, and the model reflects that difference in the achievable variance reduction.
+
+## Error Analysis
+| Model | Simulation | Actual | Predicted | Error | Likely Reason |
+|---|---|---|---|---|---|
+| Stress | BL1.2_C150_CBF_P1500 | 29.13 MPa | 24.51 | +4.62 | Highest-stress point in test set - sparse training neighbours at that extreme |
+| Stress | BL1.6_C200_FBG_P1000 | 19.27 MPa | 15.71 | +3.56 | Max Blade Length - edge of design space |
+| Deflection | BL1.6_C200_FBG_P1500 | 136.39 mm | 71.30 | +65.09 | Max Blade Length + Fiberglass + max Load, all compounding - extreme corner, few neighbours |
+| Deflection | BL1.6_C200_FBG_P1000 | 90.93 mm | 50.27 | +40.66 | Same extreme corner, lower load |
+| Deflection | BL1.2_C150_FBG_P500 | 33.51 mm | 54.26 | −20.75 | Small chord + Fiberglass - opposite corner, overpredicted |
+ 
+**Pattern:** every large error sits at an edge/corner of the factorial design (max blade length, min chord, max load, or Fiberglass extremes) - not scattered randomly. This reflects sparse training data at the extremes, not a failure to learn the underlying relationships.
+
+## Strengths and Limitations of the ML model
+### Strengths
+- Near-instant predictions vs. a full ANSYS solve
+- Strong accuracy within the trained range (Stress R²=0.939, MAE≈1.75 MPa ≈6% of range)
+- Captures nonlinear power-law behaviour with no manual feature engineering
+- Correctly distinguishes material-dependent (deflection) from material-independent (stress) behaviour - a non-obvious mechanical distinction recovered purely from data
+- Enables fast screening of many candidate designs at once
+### Limitations
+- Valid only within the sampled ranges: Blade Length 0.8–1.6 m, Chord 150–300 mm, 3 materials, Load 500–1500 Pa
+- New airfoil profiles or materials would require new ANSYS data and retraining
+- Precision degrades at the edges/corners of the design space (see error analysis)
+- Not a substitute for final ANSYS validation before manufacture
+
+## Applications
+- Preliminary blade design: screen many (Length, Chord, Material, Load) combinations in seconds
+- Rapid optimisation loops (e.g. minimise deflection subject to a stress constraint) where thousands of evaluations are needed
+- Pre-filtering designs before committing to expensive detailed FEA
+- Educational demonstration of physically-validated, non-black-box ML in engineering
+
