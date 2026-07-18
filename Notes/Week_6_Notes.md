@@ -154,3 +154,32 @@
 - Pre-filtering designs before committing to expensive detailed FEA
 - Educational demonstration of physically-validated, non-black-box ML in engineering
 
+## Optimisation
+- **Parameters tested:** Number of Trees {50, 100, 200, 300}, Max Depth {5, 10, 20, None}, Min Samples Split {2, 5, 10}
+- **Experiments run:** 48 configurations per model (96 total)
+- **Best configuration - Stress model:** 200 trees, max_depth=None, min_samples_split=2
+- **Best configuration - Deflection model:** 100 trees, max_depth=None, min_samples_split=2 (identical to baseline)
+
+### Comparison with Baseline
+**Stress Model**
+ 
+| Metric | Baseline | Optimized |
+|---|---|---|
+| MAE | 1.661 MPa | 1.634 MPa |
+| RMSE | 2.154 MPa | 2.126 MPa |
+| R² | 0.943 | 0.945 |
+ 
+**Deflection Model**
+ 
+| Metric | Baseline | Optimized |
+|---|---|---|
+| MAE | 11.393 mm | 11.393 mm |
+| RMSE | 20.170 mm | 20.170 mm |
+| R² | 0.696 | 0.696 |
+ 
+
+### Observations
+- **Did tuning significantly improve the models?** Barely, for stress (a small R² gain from more trees reducing prediction variance); not at all for deflection - the baseline was already the best of all 48 tested configs.
+- **Which parameter had the greatest impact?** `min_samples_split`, but negatively - increasing it past 2 consistently hurt test R² for both models (deflection dropped to as low as 0.40 at min_samples_split=10), rather than improving generalization.
+- **Was the improvement worth the added complexity?** Not meaningfully. Both models show a train/test R² gap (stress: 0.99 vs 0.94; deflection: 0.97 vs 0.70), but deliberately constraining the models to shrink this gap only made test performance worse, confirming the gap reflects data sparsity (few training points at the extremes, per Day 37/40) rather than fixable overfitting. Extensive tuning wasn't needed to reach a near-optimal result.
+
