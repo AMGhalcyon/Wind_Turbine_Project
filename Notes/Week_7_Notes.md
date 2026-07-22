@@ -29,3 +29,50 @@ Random Forest builds many independent trees and averages them; XGBoost builds tr
 - Deflection: Random Forest remains the better choice, better test R²/RMSE, a smaller overfitting gap, more robust on the harder, sparser target.
 
 Using a single algorithm for both targets isn't a requirement - the two targets have genuinely different statistical character (smooth vs. complex/sparse), and this two-model choice is justified by metrics, not convenience. Both remain simple, reproducible (`random_state=42`), and easy to explain.
+
+
+
+## Cross Validation
+
+### Why Cross-Validation?
+
+With only 81 simulations, an 80/20 split leaves just 17 rows in the test set. That's a small enough sample that a few unusual rows, either unusually easy or unusually hard to predict, can swing MAE, RMSE, and R² quite a bit. Previously whole RF vs XGBoost comparison rested on one such split, so there was no way to know if those numbers were real or just a lucky (or unlucky) draw.
+
+5-fold CV fixes this by rotating which 1/5 of the data is held out, training the model 5 times total. Every row gets tested on exactly once. Instead of one score, we get 5, and the spread of those 5 tells us how much to trust the average.
+
+## Results
+
+Same final models as previously taken (RF: `n_estimators=100`; XGBoost: `n_estimators=100, max_depth=4, learning_rate=0.1`), run on the full dataset with `KFold(n_splits=5, shuffle=True, random_state=42)`. Scaling was refit inside each fold to avoid leakage.
+
+| Model | Target | Mean MAE | Mean RMSE | Mean R² | Std Dev (R²) |
+|---|---|---|---|---|---|
+| Random Forest | Stress | 1.80 MPa | 2.48 MPa | 0.941 | 0.027 |
+| XGBoost | Stress | 0.08 MPa | 0.13 MPa | 0.9997 | 0.0005 |
+| Random Forest | Deflection | 14.00 mm | 24.69 mm | 0.375 | 0.466 |
+| XGBoost | Deflection | 11.89 mm | 21.99 mm | 0.644 | 0.080 |
+
+The number that matters most here isn't the mean, it's Random Forest's Deflection std dev of 0.466. Per-fold, its R² ranges from **-0.55 to 0.69**. One fold was worse than just guessing the average. XGBoost's Deflection R² only ranged 0.55–0.77, nowhere near that swing.
+
+**Answers:**
+- **Most stable:** XGBoost, on both targets, no contest.
+- **Least fold-to-fold variation:** XGBoost — Random Forest's Deflection score literally goes negative on one split.
+- **Overfitting:** Random Forest's previous grid search already showed a persistent train/test gap on Deflection (~0.27). That same fragility shows up here as fold instability. XGBoost's shallower trees + boosting generalize more evenly.
+
+### Interpretation
+
+**More reliable model:** XGBoost. Random Forest's Day 43 Deflection score of 0.696 R² looks solid on its own, but CV shows that number could easily have been 0.5 or even negative with a different split. That's not a model you can stand behind with 81 data points.
+
+**Generalizes better:** XGBoost, especially on Deflection, where the *consistency* gap is the real finding, not just the accuracy gap.
+
+**Is Deflection harder than Stress?** Yes, clearly, for both models. Stress scales in a near-linear, almost textbook way with load and geometry, so it's easy to nail. Deflection depends on a messier mix of stiffness, geometry, and material — harder to model, and it shows in both models' lower and noisier R².
+
+**Dataset size matters:** With ~16 rows per test fold, one odd geometry can tank a fold's score. That's exactly what happened to Random Forest. It's not a coding bug, it's the small dataset doing what small datasets do, and it's why we ran this test in the first place.
+
+## Model Selection Update
+
+Previous findings hinted XGBoost was ahead. This confirms it wasn't a fluke — across 5 independent splits, XGBoost beats Random Forest on both accuracy and (more importantly) stability.
+
+**Final call: XGBoost**, for both Stress and Deflection, going forward. Random Forest stays useful as a baseline and for its feature importances, but it's not the model to trust on a dataset this size.
+
+
+
