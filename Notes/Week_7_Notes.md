@@ -75,4 +75,40 @@ Previous findings hinted XGBoost was ahead. This confirms it wasn't a fluke — 
 **Final call: XGBoost**, for both Stress and Deflection, going forward. Random Forest stays useful as a baseline and for its feature importances, but it's not the model to trust on a dataset this size.
 
 
+## Learning Curves
+Using the XGBoost model, I plotted training score vs. validation score as training set size grows from ~12 to 64 rows.
+
+**Stress:** Training R² sits at ~1.0 the whole way. Validation R² starts poor with few samples (even negative at n=12) but climbs steadily and converges to 0.999 by n=64. The gap between the two curves shrinks to almost nothing. (converges)
+
+**Deflection:** Training R² stays pinned near 0.998 throughout. Validation R² is noisy and lands at only 0.579 at full training size, a persistent, large gap that never closes.
+
+### Model Diagnosis
+
+| Model | Training Score | Validation Score | Diagnosis |
+|---|---|---|---|
+| Stress | 1.000 | 0.999 | Well-fitted |
+| Deflection | 0.998 | 0.579 | Overfitting |
+
+The Stress curves converging tells the story on their own, the model isn't just memorizing, it's actually learning the relationship.
+
+Deflection is the opposite story: near-perfect training score paired with a validation score that's both much lower and still bouncing around at n=64 is the classic overfitting sign, the model fits the training rows well but that fit isn't transferring reliably to new ones. XGBoost generalizes better than a plain average here, but it's still the weaker of the two models, consistent with previous finding that Deflection is a harder target to capture.
+
+## Dataset Discussion
+
+81 simulations is enough to prove the concept works, Stress prediction is essentially solved at this sample size, and even Deflection beats a naive baseline. But it's not enough to fully close the gap: the validation curve is still climbing and still noisy at the largest training size tested, which is a direct signal (not a guess) that more data would likely help.
+
+Deflection is harder because it depends on a more complex combination of geometry and material stiffness than Stress, which is closer to a straightforward function of load and cross-section. With few examples spanning that combined space, the model has less to learn the pattern from.
+
+Generating more ANSYS simulations was outside the scope of this project — each one takes real setup and compute time, and 81 was what fit the project timeline. This is a genuine constraint, not a shortcut.
+
+### Possible Future Works
+
+- Run more ANSYS simulations, prioritizing the deflection-sensitive region of the design space
+- Add more airfoil profiles beyond what's currently covered
+- Test additional blade materials
+- Widen the range of blade lengths and chord lengths tested
+- Try additional algorithms (e.g., Gradient Boosting variants, Gaussian Process Regression) that may handle small, noisy targets like Deflection better
+
+
+
 
