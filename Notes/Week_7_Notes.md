@@ -110,5 +110,45 @@ Generating more ANSYS simulations was outside the scope of this project — each
 - Try additional algorithms (e.g., Gradient Boosting variants, Gaussian Process Regression) that may handle small, noisy targets like Deflection better
 
 
+## Sensitivity Analysis
+
+
+Final XGBoost model (trained on all 81 rows) was swept across each design parameter, holding the others fixed at Blade Length = 1.2 m, Chord = 150 mm, Material = Carbon Fiber, Load = 1000 Pa.
+
+**Blade Length (0.8 -> 1.6 m):** Stress 8.6 -> 34.5 MPa (4.0x). Deflection 2.0 -> 46.2 mm (22.9x). Deflection blows up far faster than stress — matches beam theory, where deflection scales with L⁴ but stress only with L².
+
+**Chord Length (150 -> 300 mm):** Stress 19.4 -> 4.9 MPa (drops 4.0x). Deflection 15.1 -> 0.78 mm (drops 19.4x). A wider chord stiffens the blade dramatically, this tracks the chord³ term in the second moment of area.
+
+**Applied Load (500 -> 1500 Pa):** Stress 9.7 -> 29.1 MPa (3.0x, essentially linear with load, as expected for linear elastic behavior). Deflection 6.6 -> 24.2 mm (3.6x, close to linear too).
+
+**Material (bonus check, supporting the ranking below):** Stress is basically identical across Aluminium, Fiberglass, and Carbon Fiber (~19.4 MPa each) since stress here mostly depends on geometry and load, not stiffness. Deflection is a different story, Fiberglass deflects 63.5 mm vs Carbon Fiber's 15.1 mm (4.2x), because Fiberglass is far less stiff.
+
+
+
+## Parameter Ranking
+
+Ranked by max/min ratio across each sweep:
+
+| Rank | Variable | Stress Ratio | Deflection Ratio | Influence |
+|---|---|---|---|---|
+| 1 | Blade Length | 4.0x | 22.9x | Very High |
+| 2 | Chord Length | 4.0x | 19.4x | Very High |
+| 3 | Material | ~1.0x | 4.2x | Moderate |
+| 4 | Applied Load | 3.0x | 3.6x | Moderate |
+
+Blade Length and Chord Length dominate, both are geometric parameters that compound through the beam-stiffness equations. Material and Load have real but comparatively smaller effects, and load's effect is close to linear rather than compounding.
+
+## Structural Recommendations
+
+**To reduce deflection:** shorten the blade or widen the chord, both are far more effective than switching materials or reducing load. Chord length is the standout lever here since widening it cuts deflection by nearly 20x across the tested range.
+
+**To reduce stress:** blade length and chord length again dominate, roughly symmetrically (~4x each); load has a smaller, linear effect; material barely matters for stress at all.
+
+**Trade-off:** a shorter blade and wider chord both reduce stress and deflection, but a wider chord adds mass, drag, and material cost, and a shorter blade cuts into swept area (and therefore energy capture), the ML model can't quantify that trade-off itself, since it wasn't trained on cost or aerodynamic data, but it makes clear that geometry decisions carry far more structural weight than material choice.
+
+
+
+
+
 
 
