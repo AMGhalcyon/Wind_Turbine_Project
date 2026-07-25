@@ -146,6 +146,23 @@ Blade Length and Chord Length dominate, both are geometric parameters that compo
 
 **Trade-off:** a shorter blade and wider chord both reduce stress and deflection, but a wider chord adds mass, drag, and material cost, and a shorter blade cuts into swept area (and therefore energy capture), the ML model can't quantify that trade-off itself, since it wasn't trained on cost or aerodynamic data, but it makes clear that geometry decisions carry far more structural weight than material choice.
 
+## Code Refactoring 
+Benefits of modular code
+- **One source of truth.** `Max_Equiv_Stress_Pa` cleaning and the
+  `Material` one-hot encoding used to be re-typed in every notebook, now
+  it's one function (`data_processing.load_dataset`,
+  `data_processing.encode_materials`), so a fix only has to happen once.
+- **Consistent pipelines.** `training.build_pipeline` is the same
+  ColumnTransformer + model pipeline used in the RF/XGBoost notebooks, the
+  cross-validation notebook, and the learning-curve notebook. No more risk
+  of one notebook scaling before the split and another scaling inside a
+  Pipeline.
+- **Shorter notebooks.** Notebooks now read as a narrative (load → prepare ->
+  train -> evaluate -> plot) 
+- **Reusable for the prediction tool.** Later on the prediction tool
+  (`predict.py`) reuses `data_processing`, `training`, and `prediction`
+  directly — no reimplementation needed.
+
 
 
 

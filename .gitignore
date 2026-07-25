@@ -3,3 +3,4 @@ ANSYS/Wind_Turbine_Simulations_files
 ANSYS/fluent-0-error.log
 Python/.ipynb_checkpoints
 Dataset/.ipynb_checkpoints
+src/__pycache__
