@@ -41,12 +41,12 @@ def build_pipeline(model, numeric_cols=NUMERIC_COLS) -> Pipeline:
 
 
 def train_final_models(X_encoded, y_stress, y_deflection):
-    # per-target model selection: XGBoost for stress, RF for deflection
+    # train final models on complete dataset for design exploration
     stress_pipeline = build_pipeline(
         XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, random_state=RANDOM_STATE)
     )
     deflection_pipeline = build_pipeline(
-        RandomForestRegressor(n_estimators=100, random_state=RANDOM_STATE)
+        XGBRegressor(n_estimators=100, max_depth=4, learning_rate=0.1, random_state=RANDOM_STATE)
     )
     stress_pipeline.fit(X_encoded, y_stress)
     deflection_pipeline.fit(X_encoded, y_deflection)
