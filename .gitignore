@@ -4,3 +4,5 @@ ANSYS/fluent-0-error.log
 Python/.ipynb_checkpoints
 Dataset/.ipynb_checkpoints
 src/__pycache__
+.venv/
+.claude/worktrees/agent-aabda32db7aa8c924

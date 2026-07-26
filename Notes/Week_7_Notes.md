@@ -157,7 +157,7 @@ Benefits of modular code
   cross-validation notebook, and the learning-curve notebook. No more risk
   of one notebook scaling before the split and another scaling inside a
   Pipeline.
-- **Shorter notebooks.** Notebooks now read as a narrative (load → prepare ->
+- **Shorter notebooks.** Notebooks now read as a narrative (load -> prepare ->
   train -> evaluate -> plot) 
 - **Reusable for the prediction tool.** Later on the prediction tool
   (`predict.py`) reuses `data_processing`, `training`, and `prediction`
