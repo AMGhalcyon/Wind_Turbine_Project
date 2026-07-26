@@ -165,9 +165,9 @@
  
 | Metric | Baseline | Optimized |
 |---|---|---|
-| MAE | 1.661 MPa | 1.634 MPa |
-| RMSE | 2.154 MPa | 2.126 MPa |
-| R² | 0.943 | 0.945 |
+| MAE | 1.747 MPa | 1.615 MPa |
+| RMSE | 2.234 MPa | 2.159 MPa |
+| R² | 0.939 | 0.943 |
  
 **Deflection Model**
  
