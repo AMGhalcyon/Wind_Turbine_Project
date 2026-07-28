@@ -164,6 +164,11 @@ Benefits of modular code
   directly — no reimplementation needed.
 
 
+## Predict Tool for Users
+
+Built a command-line tool that lets anyone input blade parameters and get instant stress and deflection predictions. The tool loads the trained XGBoost models, validates inputs (catches negatives, invalid materials), warns when values fall outside the training range, and displays results in a clean colored interface. Predictions are accurate to within 0.02 MPa of the actual simulation data. The entire workflow is reproducible—run `train_and_save_models.py` once to generate the models, then `predict.py` anytime to make predictions. This addresses the earlier gap of having models only in notebooks without a practical way for others to use them.
+
+
 
 
 
