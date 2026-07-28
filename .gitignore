@@ -1,9 +1,35 @@
+# ANSYS files
 ANSYS/_ProjectScratch
 ANSYS/Wind_Turbine_Simulations_files
 ANSYS/fluent-0-error.log
+
+# Jupyter
 Python/.ipynb_checkpoints
 Dataset/.ipynb_checkpoints
+
+# Python
 src/__pycache__
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
 .venv/
-.claude/worktrees/agent-aabda32db7aa8c924
-.vscode
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Models (large binary files)
+models/*.pkl
+
+# Temporary files
+*.tmp
+*.log
+*.bak
