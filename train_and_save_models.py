@@ -1,8 +1,8 @@
 """
-Train XGBoost models and save them for the prediction application.
+Train Gaussian Process Regression models and save them for the prediction application.
 
 Uses train_final_models() which trains on the complete dataset with
-pipelines that include preprocessing (StandardScaler + XGBoost).
+pipelines that include preprocessing (StandardScaler + GPR).
 
 @author: anish
 """
@@ -48,7 +48,7 @@ def find_dataset():
 def main():
     """Train and save the final XGBoost models."""
     print(f"\n{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}{'Training Final XGBoost Models':^70}{Colors.END}")
+    print(f"{Colors.BOLD}{Colors.CYAN}{'Training Final GPR Models':^70}{Colors.END}")
     print(f"{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}\n")
 
     # Find dataset
@@ -67,15 +67,15 @@ def main():
     print(f"{Colors.GREEN}      [OK] Loaded {len(data)} samples{Colors.END}")
     print(f"{Colors.GREEN}      [OK] Features: {X_encoded.shape[1]} columns (with one-hot encoding){Colors.END}\n")
 
-    # Train final models (pipelines with StandardScaler + XGBoost)
-    print(f"{Colors.YELLOW}[3/4] Training XGBoost models with preprocessing pipelines...{Colors.END}")
-    print(f"      Note: Models include StandardScaler preprocessing")
-    print(f"      (This may take a minute...)\n")
+    # Train final models (pipelines with StandardScaler + GPR)
+    print(f"{Colors.YELLOW}[3/4] Training GPR models with preprocessing pipelines...{Colors.END}")
+    print(f"      Note: Anisotropic RBF kernel + log-transform")
+    print(f"      (This may take a few minutes due to optimizer restarts...)\n")
 
-    stress_model, deflection_model = train_final_models(X_encoded, y_stress, y_deflection)
+    stress_model, deflection_model = train_final_models(X_encoded, y_stress, y_deflection, model_type="gaussian_process")
 
-    print(f"{Colors.GREEN}      [OK] Stress model trained (Pipeline: StandardScaler + XGBoost){Colors.END}")
-    print(f"{Colors.GREEN}      [OK] Deflection model trained (Pipeline: StandardScaler + XGBoost){Colors.END}\n")
+    print(f"{Colors.GREEN}      [OK] Stress model trained (Pipeline: StandardScaler + GPR){Colors.END}")
+    print(f"{Colors.GREEN}      [OK] Deflection model trained (Pipeline: StandardScaler + GPR){Colors.END}\n")
 
     # Save models
     print(f"{Colors.YELLOW}[4/4] Saving models...{Colors.END}")
