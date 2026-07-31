@@ -123,7 +123,7 @@ Before generating our database, we performed a mesh sensitivity study inside ANS
 
 <p align="center">
   <img src="Visualisations/Desgin_and_initial_Simulation/simulation-conditions.png" width="48%" alt="ANSYS Load and Boundary Conditions setup" />
-  <img src="Visualisations/Load_study/1000Pa_Equivalent_Stress.png" width="48%" alt="ANSYS equivalent stress contour result" />
+  <img src="Visualisations/Load_study/1000Pa_equivalent_stress.png" width="48%" alt="ANSYS equivalent stress contour result" />
 </p>
 
 ---
