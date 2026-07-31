@@ -162,7 +162,7 @@ To prepare simulation data for training:
 
 ### Model Performance Comparison (Test Set Metrics)
 
-We evaluated all three regressors on unseen test splits. The final Gaussian Process Regression (GPR) with an anisotropic RBF kernel achieved near-perfect performance on both targets:
+We evaluated all three regressors on held-out test splits. Because our data is a factorial grid, an 80/20 split holds out new *combinations* of factor levels, not new values. These metrics show how well each model reproduces the grid; true in-between interpolation is measured later via the power-law sweeps. The Gaussian Process Regression (GPR) achieved near-perfect performance on both targets:
 
 | Target | Metric | Random Forest | XGBoost | **GPR (Final)** |
 | :--- | :---: | :---: | :---: | :---: |
@@ -190,7 +190,7 @@ A single train/test split can be misleading, so we repeated the comparison under
 </p>
 
 **Key insights:**
-1. **GPR is perfect *and* consistent.** It achieves $R^2 = 1.0000$ in **every** fold for both targets (per-fold $R^2 = [1, 1, 1, 1, 1]$). So the near-perfect test scores aren't a one-off lucky split — the model generalizes this well every time.
+1. **GPR is perfect *and* consistent.** It achieves $R^2 = 1.0000$ in **every** fold for both targets (per-fold $R^2 = [1, 1, 1, 1, 1]$). The near-perfect scores aren't a one-off lucky split — the model's grid reproduction is exceptionally stable.
 2. **Random Forest breaks down on deflection.** A CV $R^2$ of $0.375 \pm 0.466$ swings wildly between folds, sometimes near-zero, because it can't represent the $L^4$ power-law behaviour. It simply isn't a reliable deflection model.
 3. **XGBoost shows the same weakness as on the test set.** Strong on stress ($0.9997$), but drops to $0.644$ on deflection.
 4. **Cross-validation and the test set agree.** GPR is the only model that hits both targets consistently, in every fold. That's what drove the model selection below.
@@ -366,6 +366,22 @@ Thank you for using the Wind Turbine Blade Prediction System!
 ```
 
 The application warns you immediately if your inputs exceed training limits, maintaining strict bounds compliance.
+
+### Off-Grid Validation
+
+To verify the surrogate actually interpolates between training levels rather than just memorising the grid, one ANSYS simulation was run at the exact off-grid configuration above (1.3 m, 180 mm, Carbon Fiber, 1200 Pa):
+
+| Metric | GPR Prediction | ANSYS Ground Truth | Error |
+| :--- | :---: | :---: | :---: |
+| Equivalent Stress | 19.42 MPa | 18.85 MPa | +3.0% |
+| Tip Deflection | 14.05 mm | 13.67 mm | +2.8% |
+
+<p align="center">
+  <img src="Visualisations/Notebook_Plots/offgrid_validation_stress.png" width="48%" alt="Off-grid validation: ANSYS equivalent stress contour" />
+  <img src="Visualisations/Notebook_Plots/offgrid_validation_deflection.png" width="48%" alt="Off-grid validation: ANSYS total deformation contour" />
+</p>
+
+A ~3% error at a point off-grid in three variables simultaneously confirms the GP has internalised the underlying beam mechanics rather than just memorising the 81-point factorial. This is consistent with the power-law sweep's ~2% exponent deviations and provides the concrete absolute-accuracy number that the test-set R² — which only measures grid reproduction — cannot.
 
 ---
 
