@@ -46,7 +46,7 @@ def find_dataset():
 
 
 def main():
-    """Train and save the final XGBoost models."""
+    """Train and save the final GPR models."""
     print(f"\n{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}")
     print(f"{Colors.BOLD}{Colors.CYAN}{'Training Final GPR Models':^70}{Colors.END}")
     print(f"{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}\n")

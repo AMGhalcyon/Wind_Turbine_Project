@@ -47,7 +47,7 @@ DEFLECTION_MODEL_PATH = MODEL_DIR / "Best_Deflection_Model.pkl"
 
 
 def load_models():
-    """Load the trained XGBoost models from disk."""
+    """Load the trained GPR models from disk."""
     if not STRESS_MODEL_PATH.exists():
         print(f"{Colors.RED}Error: Stress model not found at {STRESS_MODEL_PATH}{Colors.END}")
         print(f"{Colors.YELLOW}Please train and save your models first.{Colors.END}")
