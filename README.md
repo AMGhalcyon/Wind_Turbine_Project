@@ -395,4 +395,12 @@ A ~3% error at a point off-grid in three variables simultaneously confirms the G
 
 ---
 
+---
+
+## License
+
+Released under the [MIT License](LICENSE). Feel free to use, modify, and build on this work — just keep the copyright notice.
+
+---
+
 Developed by Anish Gangavaram.
