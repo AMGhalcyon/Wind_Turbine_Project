@@ -1,329 +1,238 @@
-# Wind Turbine Blade: Structural Analysis & ML Prediction
+<div align="center">
 
-An engineering design tool and machine learning framework that evaluates and predicts wind turbine blade structural responses—specifically **equivalent von-Mises stress** and **tip deflection**—under varying geometric shapes, materials, and aerodynamic wind loads.
+# Wind Turbine Blade Stress & Deflection Predictor
 
-By bridging the gap between heavy numerical finite element simulations and rapid design iterations, this framework integrates **aerodynamic Blade Element Momentum (BEM) theory, parametric CAD modeling, FEA simulations, and predictive Machine Learning pipelines** into a single, cohesive workflow.
+**From a CAD model, to 81 ANSYS simulations, to a physics-informed ML model<br/>that predicts how much a blade bends and how hard it is stressed, in milliseconds.**
+
+![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9-F7931E?logo=scikitlearn&logoColor=white)
+![ANSYS](https://img.shields.io/badge/ANSYS-Mechanical-FFB71B)
+![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)
+
+<img src="Visualisations/Design_and_initial_Simulation/Blade_Design.png" width="48%" alt="Parametric NACA 4412 blade in Fusion 360" />
+<img src="Visualisations/Load_study/1000Pa_equivalent_stress.png" width="48%" alt="ANSYS von Mises stress contour at 1000 Pa" />
+
+<sub>Left: the parametric NACA 4412 blade in Fusion 360. Right: von Mises stress from ANSYS under 1000 Pa.</sub>
+
+| **81** | **+0.2 % / −0.6 %** | **milliseconds** |
+| :---: | :---: | :---: |
+| ANSYS simulations | error on a brand-new simulation<br/>(stress / deflection) | per prediction, instead of<br/>minutes to hours of FEA |
+
+</div>
 
 ---
 
-## Project Overview
+## The question
 
-Designing wind turbine blades is a balancing act between aerodynamic output and structural limits. Evaluating a new blade geometry typically requires editing CAD models and running hours of computationally expensive Finite Element Analysis (FEA) inside solvers like ANSYS or Abaqus. This creates a severe bottleneck in the early exploration phase. 
+A wind turbine blade is a long, thin wing fixed at one end. When the wind pushes on it, two things matter: **how far the tip bends** (bend too far and it can strike the tower) and **how hard the material is stressed** (too much and it fails).
 
-This repository solves this bottleneck. By training machine learning pipelines over a multi-variable parametric design space, we can bypass the heavy FEA steps during initial iterations. The result? **Instantaneous structural predictions**—learning the underlying patterns of stress and deflection from simulation data—allowing engineers to perform rapid parameter sweeps and design space exploration in seconds.
+Engineers check both with finite element analysis (FEA), but every new design means editing CAD and re-running a simulation that takes minutes to hours. I wanted to know: **can a model trained on a set of simulations answer instantly, and can I prove it's actually right?**
+
+---
+
+## What I built
 
 ```mermaid
-flowchart TD
-    A([CAD Design]) --> B([ANSYS Simulations])
-    B --> C[(Engineering Dataset)]
-    C --> D([Data Processing])
-    D --> E{{"Machine Learning"}}
-    E --> F([Random Forest])
-    E --> G([XGBoost])
-    E --> K([Gaussian Process])
-    F --> H([Model Evaluation])
-    G --> H
-    K --> H
-    H --> I([Sensitivity Analysis])
-    I --> J([Final GPR Model])
+flowchart LR
+    A["Fusion 360 CAD<br/>NACA 4412 blade"] --> B["ANSYS Mechanical<br/>81 static runs"]
+    B --> C[("Dataset<br/>81 rows")]
+    C --> D["Beam theory check<br/>power laws"]
+    D --> E["Model comparison<br/>+ honest validation"]
+    E --> F["Physics-informed GP<br/>predict.py"]
 
-    style A fill:#27ae60,stroke:#1e8449,stroke-width:1px,color:#fff
-    style B fill:#2980b9,stroke:#1f618d,stroke-width:1px,color:#fff
-    style C fill:#27ae60,stroke:#1e8449,stroke-width:1px,color:#fff
-    style D fill:#d35400,stroke:#a04000,stroke-width:1px,color:#fff
-    style E fill:#8e44ad,stroke:#6c3483,stroke-width:1px,color:#fff
-    style F fill:#c0392b,stroke:#922b21,stroke-width:1px,color:#fff
-    style G fill:#c0392b,stroke:#922b21,stroke-width:1px,color:#fff
-    style H fill:#2980b9,stroke:#1f618d,stroke-width:1px,color:#fff
-    style I fill:#27ae60,stroke:#1e8449,stroke-width:1px,color:#fff
-    style J fill:#8e44ad,stroke:#6c3483,stroke-width:1px,color:#fff
-    style K fill:#c0392b,stroke:#922b21,stroke-width:1px,color:#fff
+    classDef step fill:#2a78d6,stroke:#1f5fae,color:#ffffff
+    classDef final fill:#1baf7a,stroke:#138a5f,color:#ffffff
+    class A,B,C,D,E step
+    class F final
 ```
 
----
+### 1. The blade
+A parametric blade in Autodesk Fusion 360, built from a **NACA 4412** airfoil:
 
-## Project Structure
-
-```
-├── ANSYS/              # FEA simulation scripts & results
-├── CAD/                # Parametric blade geometry models
-├── Dataset/            # Multi-variable training dataset
-├── Notes/              # Design iteration & research notes
-├── Python/             # Jupyter notebooks (exploration, training, analysis)
-├── Visualisations/     # Plots, charts & exported figures
-├── models/             # Serialized trained models
-├── src/                # Core Python package (processing, ML, utilities)
-├── predict.py          # CLI: one-shot structural prediction
-├── requirements.txt    # Python dependencies
-└── train_and_save_models.py  # CLI: train & persist ML models
-```
-
----
-
-## Aerodynamics & Structural Physics Foundations
-
-### 1. Cantilever Beam Analogy
-Structurally, a wind turbine blade behaves like a tapered, twisted cantilever beam. The blade is rigidly fixed at the rotor hub (the root) and projects out freely to the tip, bearing the brunt of aerodynamic forces.
-
-* **Bending Moment ($M$):** $M(x) = \int_{x}^{L} q(r)(r - x) \, dr$, where $q(r)$ represents the aerodynamic line load distribution.
-* **Moment of Inertia ($I$):** For hollow airfoil profiles, bending stiffness is dictated by $E \cdot I$, where $E$ is the material's Young's Modulus and $I$ is the second moment of area (governed by the airfoil's chord and thickness).
-* **Normal Bending Stress ($\sigma$):** $\sigma = \frac{M \cdot y}{I}$, where $y$ is the distance from the cross-section's neutral axis to its outer fibers.
-
-### 2. High-Fidelity Power Scaling Laws
-Applying classical Euler-Bernoulli beam theory reveals that the blade's structural performance is highly sensitive to its physical dimensions:
-* **Deflection ($\delta$):** Scales proportionally to the fourth power of length ($L$) and inversely to the cube of the chord ($c$):
-  $$\delta \propto \frac{L^4}{c^3}$$
-* **Bending Stress ($\sigma$):** Scales with the square of length ($L$) and inversely with the square of the chord ($c$):
-  $$\sigma \propto \frac{L^2}{c^2}$$
-
-> **Why do these scaling exponents remain constant despite the complex twist and taper?** 
-> 
-> Under a steady wind load, total aerodynamic force scales with the projected blade area ($F \propto P \cdot L \cdot c$). Because our blade profiles are aerodynamically scaled (thickness is a constant ratio of local chord, $t \propto c$), the cross-sectional moment of inertia scales as $I \propto c^4$. 
-> 
-> While the blade is tapered and twisted along its span, **geometric self-similarity** is maintained—the relative taper profile ($c_{\text{tip}}/c_{\text{root}}$) and twist distribution relative to span fraction ($r/L$) remain identical across all models. When integrated along the length of the beam, these geometric variations condense into a constant, dimensionless scaling multiplier (a "shape factor"). Consequently, the twist and taper do not alter the underlying power exponents; the deflection and stress scaling laws remain intact.
-
-This means that modifying geometric dimensions—specifically extending blade lengths or adjusting chord taper—affects the structure far more aggressively than changing materials.
+- **Taper:** the chord shrinks linearly to 30 % at the tip, which keeps tip mass and the bending lever arm down. In formula form, $c(r) = C_{\text{root}} \left( 1 - 0.7 \frac{r}{L_{\text{blade}}} \right)$.
+- **Twist:** 14.0° at the root → 10.5° → 7.5° → 4.7° → 2.0° at the tip (at 0, 25, 50, 75 and 100 % of the span). These are typical small-turbine values, not BEM-optimised.
 
 <p align="center">
-  <img src="Visualisations/power_law_plots.png" width="90%" alt="Power Law Scaling Curves vs Simulation Data" />
+  <img src="Visualisations/Design_and_initial_Simulation/NACA 4412 profile.png" width="60%" alt="NACA 4412 airfoil profile" />
 </p>
 
-### 3. Aerodynamic Loads, Betz Limit, and BEM Theory
-* **Lift ($L_F$) & Drag ($D_F$):** BEM theory calculates the aerodynamic loading by modeling the relative velocities at each span element, translating airfoil drag and lift distributions into axial and angular induction factors.
-* **Twist Distribution:** Because rotational velocity increases linearly toward the tip ($v = \Omega \cdot r$) while the incoming wind speed remains constant, the relative wind angle changes along the blade's span. We twist the blade from root to tip to maintain an optimal **Angle of Attack (AoA)**.
-* **Betz Limit & Wake Losses:** Fluid motion dictates that the maximum kinetic energy capture from wind is capped at **59.3%** (the Betz Limit). In practice, wake rotation (the swirl left in the wake of the rotor) reduces this efficiency, which is modeled using BEM theory induction factors.
-
----
-
-## Parametric CAD & Mesh Convergence
-
-We parameterized the 3D blade geometry in Autodesk Fusion 360 using the aerodynamic **NACA 4412 airfoil profile**:
+### 2. The simulation
+- **Supports and load:** fixed support at the hub attachment, uniform pressure on the underside of the blade.
+- **Mesh:** 3 mm global element size, chosen from a mesh study during setup (the study's raw data is not in this repo). A few runs where 3 mm was too slow used 5 mm instead.
 
 <p align="center">
-  <img src="Visualisations/Desgin_and_initial_Simulation/NACA 4412 profile.png" width="48%" alt="NACA 4412 Profile Definition" />
-  <img src="Visualisations/Desgin_and_initial_Simulation/Blade_Design.png" width="48%" alt="Parametric Fusion 360 CAD Model" />
+  <img src="Visualisations/Design_and_initial_Simulation/simulation-conditions.png" width="70%" alt="ANSYS load and boundary conditions" />
 </p>
 
-### 1. Chord Taper Formula
-To reduce excessive tip mass, minimize the bending moment arm, and decrease aerodynamical drag, the chord length decreases linearly from the root to the tip according to:
-$$c(r) = C_{\text{root}} \left( 1 - 0.7 \frac{r}{L_{\text{blade}}} \right)$$
+### 3. The dataset: 81 simulations
+Every combination of 3 levels of 4 inputs (a full $3^4$ factorial), stored in [Dataset/simulation_matrix_updated_info.csv](Dataset/simulation_matrix_updated_info.csv):
 
-### 2. Twist Distribution
-The aerodynamic angle of attack changes progressively across the blade's span to maintain an optimal angle of attack:
-* **0% span (Hub/Root):** $14.0^\circ$
-* **25% span:** $10.5^\circ$
-* **50% span:** $7.5^\circ$
-* **75% span:** $4.7^\circ$
-* **100% span (Tip):** $2.0^\circ$
+| Input | Levels |
+| :--- | :--- |
+| Blade length | 0.8 · 1.2 · 1.6 m |
+| Root chord | 150 · 200 · 300 mm |
+| Pressure load | 500 · 1000 · 1500 Pa |
+| Material (isotropic) | Aluminium alloy · Fiberglass · Carbon fiber |
 
-### 3. Mesh Convergence Study
-Before generating our database, we performed a mesh sensitivity study inside ANSYS Mechanical to balance numerical accuracy and compute costs. By analyzing how different element sizes affect equivalent stress findings, we identified:
-* **Selected Element Size:** $3 \times 10^{-3}\text{ m}$ ($3\text{ mm}$) global size.
-* **Rationale:** This size is the exact convergence inflection point. Choosing smaller sizes yielded less than a $0.5\%$ change in stress values, while larger mesh sizes failed to capture the high-strain regions at the trailing edge.
-
-<p align="center">
-  <img src="Visualisations/Desgin_and_initial_Simulation/simulation-conditions.png" width="48%" alt="ANSYS Load and Boundary Conditions setup" />
-  <img src="Visualisations/Load_study/1000Pa_equivalent_stress.png" width="48%" alt="ANSYS equivalent stress contour result" />
-</p>
-
----
-
-## Database Building (Design of Experiments)
-
-To compile our training dataset, we ran a full $3^4$ factorial Design of Experiments (DoE) in ANSYS Mechanical, executing and extracting **81 high-fidelity structural simulations** that cover the boundary extremes of our design envelope:
-
-### Parametric Design Levels:
-1. **Blade Length ($L_{\text{blade}}$):** $0.8\text{ m}$, $1.2\text{ m}$, $1.6\text{ m}$ (capturing small-to-utility scale limits)
-2. **Root Chord Length ($C_{\text{root}}$):** $150\text{ mm}$, $200\text{ mm}$, $300\text{ mm}$ (spanning slender to stocky geometries)
-3. **Applied Pressure (Wind Load):** $500\text{ Pa}$, $1000\text{ Pa}$, $1500\text{ Pa}$ (representing different wind load conditions from low to high)
-4. **Blade Material (Isotropic Properties):**
-   * **Aluminium Alloy:** $\rho = 2700\text{ kg/m}^3$, $E = 69\text{ GPa}$, $\nu = 0.33$
-   * **Fiberglass Composite:** $\rho = 1900\text{ kg/m}^3$, $E = 25\text{ GPa}$, $\nu = 0.22$
-   * **Carbon Fiber Composite:** $\rho = 1600\text{ kg/m}^3$, $E = 120\text{ GPa}$, $\nu = 0.28$
-
-All simulation outputs mapping peak equivalent stress (MPa) and tip deflection (mm) are stored in [Dataset/simulation_matrix_updated_info.csv](Dataset/simulation_matrix_updated_info.csv).
-
----
-
-## Machine Learning Predictor
-
-Our machine learning subsystem trains regressors using `scikit-learn`. The architecture wraps preprocessing steps and regression estimators into fully unified, reproducible pipelines to avoid silent feature leakage.
-
-### Model Overviews
-* **Random Forest:** An ensemble method that constructs multiple decision trees during training to output the mean prediction of individual trees, reducing overfitting while capturing non-linear relationships.
-* **XGBoost:** A powerful gradient boosting implementation that builds decision trees sequentially, focusing on correcting the errors of previous trees to achieve highly accurate, fine-tuned predictions.
-* **Gaussian Process Regression (GPR):** A non-parametric Bayesian approach that models data as a distribution over functions. It provides not just predictions, but also a measure of uncertainty (confidence intervals) for every output, making it highly suitable for engineering applications.
-
-### Data Preprocessing
-To prepare simulation data for training:
-* **Numerical Features** (Blade Length, Root Chord, and Applied Load) are normalized using a `StandardScaler`.
-* **Categorical Features** (Material) are one-hot encoded.
-* **Information Isolation:** These estimators are combined under a `ColumnTransformer` embedded directly inside our pipeline. This ensures preprocessing parameters are only fit on training splits, preventing **data leakage** during cross-validation folds.
-
-### Model Performance Comparison (Test Set Metrics)
-
-We evaluated all three regressors on held-out test splits. Because our data is a factorial grid, an 80/20 split holds out new *combinations* of factor levels, not new values. These metrics show how well each model reproduces the grid; true in-between interpolation is measured later via the power-law sweeps. The Gaussian Process Regression (GPR) achieved near-perfect performance on both targets:
-
-| Target | Metric | Random Forest | XGBoost | **GPR (Final)** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Equivalent Stress** | MAE | 1.747 MPa | 0.072 MPa | **0.0013 MPa** |
-| | RMSE | 2.234 MPa | 0.086 MPa | **0.0016 MPa** |
-| | $R^2$ | 0.9388 | 0.9999 | **1.0000** |
-| **Deflection** | MAE | 11.299 mm | 11.512 mm | **0.0016 mm** |
-| | RMSE | 20.172 mm | 22.862 mm | **0.0031 mm** |
-| | $R^2$ | 0.6960 | 0.6097 | **1.0000** |
-
-### Cross-Validation Results
-
-A single train/test split can be misleading, so we repeated the comparison under **5-fold cross-validation** (shuffled, `random_state=42`). Every model was scored five times, giving us both the mean $R^2$ and a sense of how stable it is:
-
-| Target | Metric | Random Forest | XGBoost | **GPR** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Equivalent Stress** | Mean $R^2$ (5-fold) | 0.941 ± 0.027 | 0.9997 ± 0.0005 | **1.0000 ± 0.0000** |
-| | Mean MAE | 1.801 ± 0.583 MPa | 0.082 ± 0.038 MPa | **0.0025 ± 0.0019 MPa** |
-| **Deflection** | Mean $R^2$ (5-fold) | 0.375 ± 0.466 | 0.644 ± 0.080 | **1.0000 ± 0.0000** |
-| | Mean MAE | 14.00 ± 8.33 mm | 11.89 ± 8.24 mm | **0.0026 ± 0.0024 mm** |
-
-<p align="center">
-  <img src="Visualisations/Notebook_Plots/cross_validation_r2_boxplot.png" width="48%" alt="5-fold CV R² boxplot comparison" />
-  <img src="Visualisations/Notebook_Plots/cross_validation_r2_mean_stdev.png" width="48%" alt="5-fold CV mean R² with standard deviation" />
-</p>
-
-**Key insights:**
-1. **GPR is perfect *and* consistent.** It achieves $R^2 = 1.0000$ in **every** fold for both targets (per-fold $R^2 = [1, 1, 1, 1, 1]$). The near-perfect scores aren't a one-off lucky split — the model's grid reproduction is exceptionally stable.
-2. **Random Forest breaks down on deflection.** A CV $R^2$ of $0.375 \pm 0.466$ swings wildly between folds, sometimes near-zero, because it can't represent the $L^4$ power-law behaviour. It simply isn't a reliable deflection model.
-3. **XGBoost shows the same weakness as on the test set.** Strong on stress ($0.9997$), but drops to $0.644$ on deflection.
-4. **Cross-validation and the test set agree.** GPR is the only model that hits both targets consistently, in every fold. That's what drove the model selection below.
-
-### Model Selection Rationale
-
-GPR was chosen as the final model over Random Forest and XGBoost for three reasons:
-
-1. **First model to master both targets.** Random Forest was decent on stress (R² 0.939) but unreliable on deflection (R² 0.696). XGBoost was near-perfect on stress (R² 0.9999) but overfit deflection (R² 0.6097 vs 0.999 train). GPR achieves R² 1.0000 on **both**, with near-zero error across the board. One unified model for the entire prediction tool.
-
-2. **Uncertainty quantification built in.** Unlike tree-based methods that return point estimates, GPR is Bayesian — every prediction comes with a confidence interval. For engineering decisions, knowing *how sure the model is* matters as much as the prediction itself.
-
-3. **Extracts more from the same data.** The anisotropic RBF kernel learns a separate length scale per input feature, letting the model automatically discover which parameters matter and at what resolution. The log-transform wrapper (`TransformedTargetRegressor` with `func=np.log`) turns power-law relationships into roughly linear ones, so the GP fits steep, multi-scale targets without numerical strain.
-
-**Why is GPR this accurate?** It comes down to the kind of function FEA produces. Our targets are smooth and deterministic — same inputs, same outputs — and with a tiny noise term (`alpha = 1e-8`) a Gaussian Process behaves like an *exact interpolator*: the prediction passes right through every training point and fills the gaps with smooth curves. Random Forest and XGBoost can't do that. They're piecewise-constant, so on the steep $L^4$ deflection ramp they approximate with flat steps and simply saturate. The log-transform helps too, flattening these power laws into nearly straight lines that the RBF kernel fits easily. The catch: this accuracy only holds *inside* the trained envelope. Push past the design limits and the GP predictions drift, which is why the prediction tool blocks out-of-range inputs.
-
-### Model Learning Curves
-
-To diagnose model convergence and stability, we plotted GPR learning curves across training set size increments. Training and validation scores at each step were calculated using 5-fold cross-validation:
-* **Stress Predictor:** R² = 1.0 at every training size — the GP captures the stress function perfectly from the very first slice.
-* **Deflection Predictor:** Same result — R² = 1.0 throughout, no gap between train and validation scores.
-
-**Diagnosis:** Both models are "Well-fitted" — no overfitting, no underfitting, no indication that more data would meaningfully improve results. The 81 simulations contain enough information; GPR simply extracts it more completely than tree-based alternatives.
-
-<p align="center">
-  <img src="Visualisations/learning_curves.png" width="90%" alt="GPR Learning Curves — Stress & Deflection" />
-</p>
-
-### Key ML Insights:
-1. **Stress is purely geometric and material-independent.** Peak bending stress depends only on geometry and load — Young’s modulus does not appear in the stress formula. The GPR nails this smooth, deterministic relationship (R² 1.0, MAE 0.0013 MPa) because the ARD kernel easily separates the three geometric inputs from the three one-hot material columns (which it correctly learns to ignore).
-2. **Deflection requires joint geometry–material learning.** Deflection couples blade geometry (L⁴ power law) with material stiffness. The anisotropic RBF kernel handles this by assigning each input a dedicated length scale — a separate resolution for Blade Length (metre scale), Chord Length (centimetre scale), and material (binary). This per-feature adaptability is what lets GPR exceed tree-based models on a small 81-sample dataset.
-
----
-
-## Sensitivity Analysis & Structural Recommendations
-
-Using the trained GPR models, we performed parameter sweeps across the full design boundary range to establish practical structural guidelines for blade optimization.
-
-### Design Variable Sensitivity Sweeps:
-To evaluate individual parameters, we swept each variable across its full range while holding baseline configurations constant at: $L = 1.2\text{ m}$, $C_{\text{root}} = 300\text{ mm}$, Carbon Fiber material, and Wind Load = $1000\text{ Pa}$.
-
-| Rank | Design Parameter | Bending Stress Sweep | Tip Deflection Sweep | System Influence | Engineering Rationale |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| **1** | **Blade Length** | 4.02× increase | 15.59× increase | **Critical** | Governs the bending moment lever arm ($\delta \propto L^4$). |
-| **2** | **Chord Length** | 4.02× decrease | 7.43× decrease | **Critical** | Controls cross-sectional moment of inertia. |
-| **3** | **Blade Material** | ~1.0× (No effect) | 4.80× reduction | **Moderate** | Governs structural deflection only; has no effect on stress. |
-| **4** | **Applied Load** | 3.00× increase | 3.00× increase | **Moderate** | Dictates bending moment ($\sigma \propto M \propto F$). |
-
-### Verifying the Power Scaling Laws
-The sweep ratios match the Euler-Bernoulli scaling laws introduced in the theory section. By performing 50-point dense sweeps through the trained GPR surrogate and fitting log-linear power-law regressions to the resulting curves, we recover the theoretical exponents with remarkable fidelity:
-
-| Relationship | Theory | GPR Fitted Exponent | Deviation |
+| Material | Density | Young's modulus $E$ | Poisson's ratio $\nu$ |
 | :--- | :---: | :---: | :---: |
-| Deflection vs Blade Length | $\delta \propto L^4$ | 4.02 | +0.5% |
-| Stress vs Blade Length | $\sigma \propto L^2$ | 2.04 | +2.0% |
-| Deflection vs Chord Length | $\delta \propto c^{-3}$ | −2.94 | −2.0% |
-| Stress vs Chord Length | $\sigma \propto c^{-2}$ | −2.04 | −2.0% |
-
-The plot below overlays the continuous GPR surrogate predictions (solid curves) against the theoretical power laws (dashed grey) normalised at the sweep midpoint. The near-perfect overlap demonstrates that the Gaussian Process has internalised the underlying beam mechanics from the 81-sample FEA dataset — without any physics constraints imposed during training.
-
-<p align="center">
-  <img src="Visualisations/Notebook_Plots/gpr_power_law_verification.png" width="90%" alt="GPR Surrogate Verification Against Theoretical Power Scaling Laws" />
-</p>
-
-The remaining two parameters complete the picture. **Applied load** scales linearly with both stress and deflection ($\sigma \propto F$, $\delta \propto F$), and the GPR model captures this exactly — a 3× increase in load (500 → 1500 Pa) produces a **3.00×** increase in both targets, matching the theoretical prediction to three significant figures.
-
-<p align="center">
-  <img src="Visualisations/Notebook_Plots/sensitivity_gpr_applied_load.png" width="90%" alt="GPR Sensitivity — Applied Load" />
-</p>
-
-**Material stiffness** ($E$) enters the beam equations only through the bending stiffness term $EI$. Because stress is governed by the ratio $M/I$ (where $I \propto c^4$), Young's modulus cancels out entirely — the GPR confirms this with a stress ratio of **1.0003×** across all three materials. Deflection, however, scales as $\delta \propto 1/E$. The model predicts a **4.80×** reduction from Fiberglass ($E \approx 25\text{ GPa}$) to Carbon Fiber ($E \approx 120\text{ GPa}$), matching the theoretical ratio $120/25 = 4.8$ exactly.
-
-### Core Engineering Insights:
-1. **Curbing Deflection:** Deflection is dominated by blade length — extending from $0.8\text{ m}$ to $1.6\text{ m}$ produces a **15.6×** increase. To prevent structural tower strikes, designers must increase root chord or switch to stiffer materials. Specifically, Carbon Fiber reduces tip deflection by **4.8×** compared to Fiberglass.
-2. **Minimizing Stress Concentrations:** Since material stiffness ($E$) does not affect peak stress (ratio 1.0003×), changing materials is ineffective for stress mitigation. Peak stress reduction must be solved geometrically — shortening the moment arm ($L$) or enlarging the root chord ($c$), each reducing stress by **4.0×** across the design range.
+| Aluminium alloy | 2700 kg/m³ | 69 GPa | 0.33 |
+| Fiberglass | 1900 kg/m³ | 25 GPa | 0.22 |
+| Carbon fiber | 1600 kg/m³ | 120 GPa | 0.28 |
 
 ---
 
-## Getting Started
+## What the simulations showed
 
-### 1. Environment Setup
-This project requires **Python 3.10+**. To set up the local virtual environment and install all packages:
+**Longer blades bend dramatically more; wider blades bend dramatically less.** That's exactly what textbook beam theory predicts. Treat the blade as a cantilever beam under pressure $P$, and the tip deflection $\delta$ and peak stress $\sigma$ scale as:
 
-**Windows (Command Prompt or PowerShell):**
+$$\delta \propto \frac{P \, L^4}{E \, c^3} \qquad\qquad \sigma \propto \frac{P \, L^2}{c^2}$$
+
+In words: double the length and the tip bends about 16× more, while the stress rises about 4×. Stiffness $E$ affects bending but not stress.
+
+Fitting that formula to all 81 runs recovers the theory straight from the data:
+
+| | Blade length | Root chord | Load |
+| :--- | :---: | :---: | :---: |
+| **Stress**, theory → fitted | 2 → **2.01** | −2 → **−2.01** | 1 → **1.00** |
+| **Deflection**, theory → fitted | 4 → **3.92** | −3 → **−2.88** | 1 → **1.00** |
+
+<p align="center">
+  <img src="Visualisations/power_law_plots.png" width="90%" alt="Power law scaling curves vs simulation data" />
+</p>
+
+Deflection falls slightly short of the ideal exponents because short, wide blades (0.8 m with a 300 mm chord) are less like slender beams: going from 150 to 300 mm chord cuts deflection 7.1× at 0.8 m but 7.6× at 1.6 m (theory: 8×). Remember that small, systematic gap; it comes back later.
+
+> **An honest note on the 81 runs.** In linear static FEA, every result is exactly proportional to load (the data confirms this to 5 significant figures), and deflection is almost exactly proportional to $1/E$. So the 81 runs are really **9 blade geometries**, each with 9 near-predictable load and material variants. That turns out to matter a lot for testing the models.
+
+<details>
+<summary><b>Show the beam theory behind it</b></summary>
+
+<br/>
+
+Structurally, the blade behaves like a tapered, twisted cantilever: fixed at the hub, free at the tip.
+
+- **Bending moment:** $M(x) = \int_{x}^{L} q(r)(r - x) \, dr$. The moment at any point is the sum of all the load beyond it, times its lever arm. $q(r)$ is the line load along the span.
+- **Bending stiffness ($E \cdot I$):** $E$ is the material's Young's modulus; $I$, the second moment of area, measures how much material sits far from the bending axis, and grows with chord and thickness.
+- **Bending stress:** $\sigma = \frac{M \cdot y}{I}$. Stress is highest at the outer surface ($y$ is the distance from the neutral axis).
+
+**Where the exponents come from.** Under uniform pressure, the total force scales with blade area, $F \propto P \cdot L \cdot c$. Because airfoil thickness is a fixed fraction of chord, $I \propto c^4$. Substituting into the cantilever formulas gives $\delta \propto P L^4 / (E c^3)$ and $\sigma \propto P L^2 / c^2$.
+
+**Why taper and twist don't change them.** Every blade shares the same taper ratio and twist-vs-span-fraction profile (geometric self-similarity), so taper and twist only change the constant in front, not the exponents.
+
+**Background: aerodynamics (context, not modelled).**
+- *Twist:* rotational speed grows toward the tip ($v = \Omega r$) while wind speed stays constant, so the relative wind angle changes along the span. Blades are twisted root-to-tip so each section sees a near-optimal angle of attack.
+- *Betz limit:* no turbine can extract more than 59.3 % of the wind's kinetic energy; wake rotation lowers the real figure further. Blade Element Momentum (BEM) theory is the standard tool for computing real aerodynamic loads.
+
+This project does **not** run BEM: the wind load is simplified to a uniform pressure on the blade.
+
+</details>
+
+---
+
+## The ML twist: when "perfect" wasn't
+
+### The trap
+My first models looked perfect. A Gaussian Process Regressor (GPR) scored $R^2 = 1.0000$ on a random train/test split and in random 5-fold cross-validation.
+
+Then I noticed the catch. In a random split, a held-out simulation's eight load/material "siblings" from the same geometry stay in the training set. Because load and material are nearly trivial to predict, the model never really gets tested on anything new.
+
+### Three tests, from weakest to strongest
+1. **Random 5-fold CV:** the flattering one.
+2. **Hold out a whole geometry:** train on 8 blade shapes, predict all 9 runs of the 9th. Repeat for every shape.
+3. **A brand-new ANSYS run:** one extra simulation (1.3 m, 180 mm, carbon fiber, 1200 Pa), off-grid in three variables at once. This is the only fully independent check.
+
+Every model gets the same log-transformed target, so the comparison is like-for-like. Mean absolute percentage error, from `python compare_models.py`:
+
+| Model | Random 5-fold (stress / defl.) | Hold out a geometry (stress / defl.) | Off-grid ANSYS run (stress / defl.) |
+| :--- | :---: | :---: | :---: |
+| Random Forest | 10.96% / 38.93% | 49.11% / 96.20% | −42.2% / −48.6% |
+| XGBoost | 1.21% / 23.00% | 37.63% / 66.91% | +3.2% / +3.3% |
+| Pure GPR (old final model) | 0.01% / 0.01% | 0.46% / 0.47% | +3.0% / +2.8% |
+| Power law (6 parameters) | 0.34% / 1.05% | 0.46% / 1.65% | +0.4% / −0.9% |
+| **Physics-informed GP (final)** | 0.03% / 0.03% | **0.11% / 0.42%** | **+0.2% / −0.6%** |
+
+<p align="center">
+  <img src="Visualisations/Notebook_Plots/model_comparison.png" width="95%" alt="Error when a whole blade geometry is held out, per model" />
+</p>
+
+### What I learned
+1. **Random splits hid the real error.** The pure GPR's random-split error (0.01 %) was about 300× smaller than its error on the new ANSYS run (~3 %).
+2. **Tree models can't do this job.** Random Forest and XGBoost predict piecewise-constant steps, so they cannot extrapolate to an unseen blade shape (40–100 % error), even with the log transform.
+3. **A 6-parameter physics formula beat the pure GPR** on the new simulation (+0.4 % / −0.9 % vs +3.0 % / +2.8 %). The physics already explains almost everything.
+4. **The best model combines both.**
+
+### The final model: physics first, ML for the leftovers
+The final model fits the beam-theory power law first, then trains a Gaussian Process only on the small leftover (the log-residual), as a function of blade length, chord and material. That leftover is the "short, wide blades aren't quite slender beams" gap from earlier. Load is left out of the GP because the physics already captures it exactly.
+
+- **Accurate:** best on both honest tests.
+- **Safe outside the data:** away from the training points the GP correction fades toward zero and the prediction leans on beam theory, instead of drifting the way a pure GPR does.
+- **Interpretable:** the fitted exponents are printed when you train, and they can be checked against textbook theory.
+
+### The final exam: a simulation the model has never seen
+
+| | Final model | ANSYS ground truth | Error |
+| :--- | :---: | :---: | :---: |
+| Equivalent stress | 18.88 MPa | 18.85 MPa | +0.2 % |
+| Tip deflection | 13.58 mm | 13.67 mm | −0.6 % |
+
+<p align="center">
+  <img src="Visualisations/Notebook_Plots/offgrid_validation_stress.png" width="48%" alt="Off-grid validation: ANSYS equivalent stress contour" />
+  <img src="Visualisations/Notebook_Plots/offgrid_validation_deflection.png" width="48%" alt="Off-grid validation: ANSYS total deformation contour" />
+</p>
+
+This is a single point, so treat it as a sanity check rather than a guarantee. The hold-out-a-geometry test above is the broader evidence.
+
+> **About uncertainty:** a GP can report its own error bars, but here they came out several times narrower than the real off-grid error, so the tool doesn't display them. Judge model uncertainty from the validation table instead.
+>
+> **About the notebooks:** `Python/` documents the journey (Random Forest → XGBoost → GPR), and those notebooks still show the original random-split metrics. `compare_models.py` is the source of truth for accuracy.
+
+---
+
+## Design takeaways
+
+How much each input changes the result across its full simulated range. These ratios are read straight from the FEA data, holding the others at 1.2 m length, 150 mm chord, carbon fiber, 1000 Pa:
+
+| Rank | Design parameter | Stress change | Deflection change | Why |
+| :---: | :--- | :---: | :---: | :--- |
+| **1** | **Blade length** 0.8 → 1.6 m | 4.02× increase | 15.59× increase | Lever arm: $\delta \propto L^4$ |
+| **2** | **Root chord** 150 → 300 mm | 4.02× decrease | 7.43× decrease | Stiffness: $I \propto c^4$ |
+| **3** | **Material** fiberglass → carbon | ≈1.00× (no effect) | 4.80× decrease | Deflection $\propto 1/E$; stress doesn't depend on $E$ |
+| **4** | **Load** 500 → 1500 Pa | 3.00× increase | 3.00× increase | Linear elasticity |
+
+- **Deflection is dominated by blade length.** Doubling the length gives ~16× more tip deflection. To control it, widen the root chord or use a stiffer material: carbon fiber deflects 4.8× less than fiberglass.
+- **Material doesn't reduce stress.** Peak stress is set by geometry and load alone, so stress problems have to be solved geometrically: a shorter blade or a wider root chord (each about 4× across the range).
+
+<p align="center">
+  <img src="Visualisations/Material_Study/Fiberglass_deformation.png" width="48%" alt="Tip deformation, fiberglass blade" />
+  <img src="Visualisations/Material_Study/Carbon_fiber_deformation.png" width="48%" alt="Tip deformation, carbon fiber blade" />
+</p>
+<p align="center"><sub>Same blade, same load: fiberglass (left) vs carbon fiber (right).</sub></p>
+
+---
+
+## Try it
+
+Requires **Python 3.10+**.
+
 ```bash
-# Navigate to the project root directory
 cd Wind_Turbine_Project
-
-# Create a virtual environment
 python -m venv .venv
-
-# Activate the virtual environment
-.venv\Scripts\activate
-
-# Install local package dependencies
+.venv\Scripts\activate            # Windows   (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
+
+python train_and_save_models.py   # fit the final models -> models/ (~1 min)
+python predict.py                 # interactive predictions
 ```
 
-**macOS / Linux:**
-```bash
-# Navigate to the project root directory
-cd Wind_Turbine_Project
+Two more commands: `python compare_models.py` reproduces the validation table and figure (~2 min), and `python tests/test_models.py` runs the checks.
 
-# Create a virtual environment
-python3 -m venv .venv
-
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Install local package dependencies
-pip install -r requirements.txt
-```
-
-### 2. Model Training
-To retrain the regression pipelines from raw simulation logs and save the serialized models directly to the `models/` directory:
-
-```bash
-python train_and_save_models.py
-```
-
-### 3. Interactive Predictions
-To compute predictions for custom configurations in real-time, launch the command-line evaluation tool:
-
-```bash
-python predict.py
-```
-
-#### Example Interactive Command Line Run:
-This example deliberately uses an **off-grid configuration** — no input sits at a DoE level, so this exact combination was never part of the 81 training simulations. The results below are genuine surrogate interpolation, not a memorized FEA answer.
+<details>
+<summary><b>Example run</b> (the off-grid validation case: this exact blade was never in the training data)</summary>
 
 ```text
 ======================================================================
-                 Wind Turbine Blade Prediction System                 
+                 Wind Turbine Blade Prediction System
 ======================================================================
 
 Loading trained models...
@@ -351,56 +260,62 @@ Prediction Results:
 ──────────────────────────────────────────────────────────────────────
 
   Maximum Equivalent Stress:
-    19.42 MPa
+    18.88 MPa
 
   Maximum Deflection:
-    14.05 mm
+    13.58 mm
 
 ──────────────────────────────────────────────────────────────────────
-
-======================================================================
-
-Make another prediction? (y/n): n
-
-Thank you for using the Wind Turbine Blade Prediction System!
 ```
 
-The application warns you immediately if your inputs exceed training limits, maintaining strict bounds compliance.
+</details>
 
-### Off-Grid Validation
-
-To verify the surrogate actually interpolates between training levels rather than just memorising the grid, one ANSYS simulation was run at the exact off-grid configuration above (1.3 m, 180 mm, Carbon Fiber, 1200 Pa):
-
-| Metric | GPR Prediction | ANSYS Ground Truth | Error |
-| :--- | :---: | :---: | :---: |
-| Equivalent Stress | 19.42 MPa | 18.85 MPa | +3.0% |
-| Tip Deflection | 14.05 mm | 13.67 mm | +2.8% |
-
-<p align="center">
-  <img src="Visualisations/Notebook_Plots/offgrid_validation_stress.png" width="48%" alt="Off-grid validation: ANSYS equivalent stress contour" />
-  <img src="Visualisations/Notebook_Plots/offgrid_validation_deflection.png" width="48%" alt="Off-grid validation: ANSYS total deformation contour" />
-</p>
-
-A ~3% error at a point off-grid in three variables simultaneously confirms the GP has internalised the underlying beam mechanics rather than just memorising the 81-point factorial. This is consistent with the power-law sweep's ~2% exponent deviations and provides the concrete absolute-accuracy number that the test-set R² — which only measures grid reproduction — cannot.
+Inputs outside the simulated envelope (0.8–1.6 m, 150–300 mm, 500–1500 Pa) still get a prediction, but with a **warning**: no simulations back that region, so the result is an unverified extrapolation.
 
 ---
 
-## Limitations & Future Work
+## Limitations & what I'd do next
 
-* **Static Loading Assumption:** Currently, the loadings are modeled as steady-state pressure profiles, neglecting transient turbine rotation forces (centrifugal tension, Coriolis acceleration, gravity cycles).
-* **Isotropic Materials:** Structural FEA calculations assume isotropic material properties. Modeling fiber-reinforced FRP composite laminates using anisotropic ply layups would enhance accuracy.
-* **Aerodynamic Coupling:** Real wind turbine blades undergo structural deflection under aerodynamic lift and drag, which changes the blade angle of attack. This elastic feedback loop (Fluid-Structure Interaction - FSI) is not captured by decoupled static models.
-* **Rotor Fatigue:** The simulation does not perform fatigue cycles analysis, which governs commercial blade design operating lives (typically 20-30 years).
-* **Surrogate & Analysis Scope:** The model is only valid within the sampled design envelope (0.8–1.6 m, 150–300 mm chord, 500–1500 Pa, three materials) — beyond it the GP has no training support. It is validated against ANSYS alone, never a physical blade, and the 81-point grid fills gaps via the kernel's smoothness assumption. The underlying FEA also assumes small deflections, so nonlinear behaviour at the envelope's extremes is not captured.
+**Simulation fidelity**
+- **Simplified loading:** a uniform static pressure stands in for real aerodynamic loads (no BEM, no rotation, centrifugal, gravity or fatigue cycles).
+- **Isotropic materials:** composites are modelled as isotropic solids, not as layered ply laminates.
+- **Mesh-sensitive peak stress:** the peak sits at the blade–hub junction, next to the fixed support, where peak values can keep rising as the mesh is refined. The mesh-study data isn't included, and a few runs used 5 mm instead of 3 mm.
+- **No fluid–structure interaction:** blade deflection doesn't feed back into the aerodynamics.
+- **Small-deflection, linear analysis:** nonlinear effects at the extremes of the envelope aren't captured.
+
+**Data & model**
+- **9 real geometries:** load and material only scale results linearly, so blade-shape coverage is 3 lengths × 3 chords. Taper ratio and thickness were never varied.
+- **One off-grid validation point:** more independent ANSYS runs (ideally space-filling, e.g. Latin hypercube) would give a far stronger accuracy estimate.
+- **Valid inside the envelope only:** 0.8–1.6 m, 150–300 mm, 500–1500 Pa, three materials.
+- **Not reproducible from the ANSYS file alone:** the Workbench results folder is too large for the repo.
+- **Validated against ANSYS only**, never against a physical blade.
+
+**Next:** space-filling simulations that also vary taper and thickness, a mesh-convergence table at the peak-stress location, and BEM-derived loads in place of uniform pressure.
 
 ---
 
----
+<details>
+<summary><b>Repository map</b></summary>
+
+```
+├── ANSYS/                    # ANSYS Workbench project file (solver results folder not included)
+├── CAD/                      # STEP files for the 9 blade geometries + early prototypes
+├── Dataset/                  # The 81-simulation dataset (CSV)
+├── Notes/                    # Weekly engineering notes - the project diary
+├── Python/                   # Jupyter notebooks: EDA, model experiments, sensitivity analysis
+├── Visualisations/           # ANSYS contour plots and analysis figures
+├── src/                      # Core package: data loading, models, evaluation, prediction
+├── tests/                    # python tests/test_models.py
+├── compare_models.py         # Reproduces every accuracy number in this README
+├── train_and_save_models.py  # Trains the final models -> models/ (created locally, not committed)
+├── predict.py                # Interactive CLI
+└── requirements.txt
+```
+
+</details>
 
 ## License
 
-Released under the [MIT License](LICENSE). Feel free to use, modify, and build on this work — just keep the copyright notice.
+Released under the [MIT License](LICENSE). Feel free to use, modify, and build on this work; just keep the copyright notice.
 
----
-
-Developed by Anish Gangavaram.
+<p align="center"><sub>Built by Anish Gangavaram</sub></p>

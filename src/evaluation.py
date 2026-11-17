@@ -21,6 +21,18 @@ def calculate_metrics(y_true, y_pred, unit_divisor=1.0) -> dict:
     }
 
 
+def mape(y_true, y_pred) -> float:
+    """Mean absolute percentage error - comparable across targets that span 100x in magnitude."""
+    y_true = np.asarray(y_true, dtype=float)
+    return float(100 * np.mean(np.abs(np.asarray(y_pred) - y_true) / y_true))
+
+
+def geometry_groups(X: pd.DataFrame) -> pd.Series:
+    """One label per CAD geometry (length x chord). Use with LeaveOneGroupOut so a test fold
+    holds out a whole blade shape - random K-fold leaks it via the load/material copies."""
+    return X["Blade_Length_m"].astype(str) + "_" + X["Root_Chord_mm"].astype(str)
+
+
 def feature_importance(model, feature_names) -> pd.Series:
     return pd.Series(model.feature_importances_, index=feature_names).sort_values(ascending=False)
 

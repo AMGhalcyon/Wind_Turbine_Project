@@ -7,11 +7,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from src.utils import (DATASET_PATH, FEATURE_COLS, NUMERIC_COLS, RANDOM_STATE,
-    TARGET_DEFLECTION, TARGET_STRESS, resolve_dataset_path, ensure_dir,)
+    TARGET_DEFLECTION, TARGET_STRESS, ensure_dir,)
 
 
-def load_dataset(path: str = DATASET_PATH) -> pd.DataFrame:
-    data = pd.read_csv(resolve_dataset_path(path))
+def load_dataset(path=DATASET_PATH) -> pd.DataFrame:
+    data = pd.read_csv(path)
     # stress column has a stray space in some exports
     data[TARGET_STRESS] = data[TARGET_STRESS].astype(str).str.replace(" ", "").astype(float)
     return data
@@ -41,7 +41,7 @@ def scale_numeric_features(X_train_raw, X_test_raw, numeric_cols=NUMERIC_COLS):
     return X_train_scaled, X_test_scaled, scaler
 
 
-def prepare_ml_ready_data(path: str = DATASET_PATH, save_dir: str = None):
+def prepare_ml_ready_data(path=DATASET_PATH, save_dir: str = None):
     data = load_dataset(path)
     X_encoded, y_stress, y_deflection = get_features_and_targets(data)
 

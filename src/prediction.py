@@ -1,27 +1,29 @@
 """
+Turn blade parameters into model inputs and run predictions / parameter sweeps.
+
 @author: anish
 """
 import pandas as pd
 
-from src.utils import MATERIAL_COLS, PA_TO_MPA, M_TO_MM
+from src.utils import ENCODED_COLS, MATERIAL_COLS, M_TO_MM, PA_TO_MPA
 
 
 def make_row(blade_length, chord, material, load) -> dict:
+    material_col = f"Material_{material}"
+    if material_col not in MATERIAL_COLS:
+        raise ValueError(f"Unknown material {material!r}")
     row = {"Blade_Length_m": blade_length, "Root_Chord_mm": chord, "Applied_Load_Pa": load}
     for m in MATERIAL_COLS:
-        row[m] = 1 if m == f"Material_{material}" else 0
+        row[m] = 1 if m == material_col else 0
     return row
 
 
-def predict_new_sample(stress_model, deflection_model, feature_cols,
-                        blade_length, chord, material, load) -> dict:
-    row = make_row(blade_length, chord, material, load)
-    df = pd.DataFrame([row])[feature_cols]
-    stress_pa = stress_model.predict(df)[0]
-    defl_m = deflection_model.predict(df)[0]
+def predict_new_sample(stress_model, deflection_model, blade_length, chord, material, load,
+                       feature_cols=ENCODED_COLS) -> dict:
+    df = pd.DataFrame([make_row(blade_length, chord, material, load)])[list(feature_cols)]
     return {
-        "stress_MPa": stress_pa / PA_TO_MPA,
-        "deflection_mm": defl_m * M_TO_MM,
+        "stress_MPa": stress_model.predict(df)[0] / PA_TO_MPA,
+        "deflection_mm": deflection_model.predict(df)[0] * M_TO_MM,
     }
 
 

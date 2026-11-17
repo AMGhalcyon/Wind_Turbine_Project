@@ -1,104 +1,61 @@
 """
-Train Gaussian Process Regression models and save them for the prediction application.
+Train the final physics-informed models on all 81 simulations and save them for predict.py.
 
-Uses train_final_models() which trains on the complete dataset with
-pipelines that include preprocessing (StandardScaler + GPR).
+Each model = Euler-Bernoulli power law fitted in log space + a Gaussian Process that
+learns the small residual the power law misses. See compare_models.py for why.
 
 @author: anish
 """
 
 import pickle
 import sys
-import pandas as pd
 from pathlib import Path
 
-# Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.data_processing import load_dataset, get_features_and_targets
+from src.data_processing import get_features_and_targets, load_dataset
 from src.training import train_final_models
-from src.utils import ensure_dir
-
-# ANSI colors for pretty output
-class Colors:
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    BOLD = '\033[1m'
-    RED = '\033[91m'
-    END = '\033[0m'
+from src.utils import (DATASET_PATH, DEFLECTION_MODEL_PATH, MODEL_DIR, STRESS_MODEL_PATH,
+                       Colors, ensure_dir)
 
 
-def find_dataset():
-    """Find the dataset CSV file."""
-    # Try common locations
-    possible_paths = [
-        Path("Dataset/simulation_matrix_updated_info.csv"),
-        Path("../Dataset/simulation_matrix_updated_info.csv"),
-        Path("Python/../Dataset/simulation_matrix_updated_info.csv"),
-    ]
+def step(text: str):
+    print(f"{Colors.YELLOW}{text}{Colors.END}")
 
-    for path in possible_paths:
-        if path.exists():
-            return str(path)
 
-    return None
+def ok(text: str):
+    print(f"{Colors.GREEN}      [OK] {text}{Colors.END}")
 
 
 def main():
-    """Train and save the final GPR models."""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}{'Training Final GPR Models':^70}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.CYAN}{'=' * 70}{Colors.END}\n")
+    print(f"\n{Colors.BOLD}{Colors.CYAN}{'=' * 70}\n{'Training Final Physics-Informed Models':^70}\n{'=' * 70}{Colors.END}\n")
 
-    # Find dataset
-    print(f"{Colors.YELLOW}[1/4] Locating dataset...{Colors.END}")
-    dataset_path = find_dataset()
-    if not dataset_path:
-        print(f"{Colors.RED}Error: Could not find simulation_matrix_updated_info.csv{Colors.END}")
-        print(f"{Colors.YELLOW}Please ensure the Dataset directory exists with the CSV file{Colors.END}")
+    step("[1/3] Loading dataset...")
+    if not DATASET_PATH.exists():
+        print(f"{Colors.RED}Error: dataset not found at {DATASET_PATH}{Colors.END}")
         sys.exit(1)
-    print(f"{Colors.GREEN}      [OK] Found: {dataset_path}{Colors.END}\n")
-
-    # Load and prepare data
-    print(f"{Colors.YELLOW}[2/4] Loading and preparing data...{Colors.END}")
-    data = load_dataset(dataset_path)
+    data = load_dataset(DATASET_PATH)
     X_encoded, y_stress, y_deflection = get_features_and_targets(data)
-    print(f"{Colors.GREEN}      [OK] Loaded {len(data)} samples{Colors.END}")
-    print(f"{Colors.GREEN}      [OK] Features: {X_encoded.shape[1]} columns (with one-hot encoding){Colors.END}\n")
+    ok(f"{len(data)} simulations, {X_encoded.shape[1]} encoded features\n")
 
-    # Train final models (pipelines with StandardScaler + GPR)
-    print(f"{Colors.YELLOW}[3/4] Training GPR models with preprocessing pipelines...{Colors.END}")
-    print(f"      Note: Anisotropic RBF kernel + log-transform")
-    print(f"      (This may take a few minutes due to optimizer restarts...)\n")
+    step("[2/3] Fitting power law + residual Gaussian Process (takes ~1 minute)...")
+    stress_model, deflection_model = train_final_models(X_encoded, y_stress, y_deflection, model_type="physics_gp")
+    for name, model in (("Stress", stress_model), ("Deflection", deflection_model)):
+        exps = model.power_law_.exponents_
+        ok(f"{name}: L^{exps['Blade_Length_m']:.2f} · c^{exps['Root_Chord_mm']:.2f} · P^{exps['Applied_Load_Pa']:.2f}")
+    print()
 
-    stress_model, deflection_model = train_final_models(X_encoded, y_stress, y_deflection, model_type="gaussian_process")
+    step("[3/3] Saving models...")
+    ensure_dir(MODEL_DIR)
+    for path, model in ((STRESS_MODEL_PATH, stress_model), (DEFLECTION_MODEL_PATH, deflection_model)):
+        with open(path, "wb") as f:
+            pickle.dump(model, f)
+        ok(str(path))
 
-    print(f"{Colors.GREEN}      [OK] Stress model trained (Pipeline: StandardScaler + GPR){Colors.END}")
-    print(f"{Colors.GREEN}      [OK] Deflection model trained (Pipeline: StandardScaler + GPR){Colors.END}\n")
-
-    # Save models
-    print(f"{Colors.YELLOW}[4/4] Saving models...{Colors.END}")
-    model_dir = Path(__file__).parent / "models"
-    ensure_dir(str(model_dir))
-
-    stress_path = model_dir / "Best_Stress_Model.pkl"
-    deflection_path = model_dir / "Best_Deflection_Model.pkl"
-
-    with open(stress_path, 'wb') as f:
-        pickle.dump(stress_model, f)
-    print(f"{Colors.GREEN}      [OK] {stress_path}{Colors.END}")
-
-    with open(deflection_path, 'wb') as f:
-        pickle.dump(deflection_model, f)
-    print(f"{Colors.GREEN}      [OK] {deflection_path}{Colors.END}\n")
-
-    print(f"{Colors.BOLD}{Colors.GREEN}{'=' * 70}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.GREEN}Training Complete!{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.GREEN}{'=' * 70}{Colors.END}\n")
-    print(f"{Colors.CYAN}Models saved to: {model_dir}{Colors.END}")
-    print(f"{Colors.CYAN}You can now run: python predict.py{Colors.END}\n")
+    print(f"\n{Colors.BOLD}{Colors.GREEN}Training complete.{Colors.END} Run: python predict.py\n")
 
 
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     main()
